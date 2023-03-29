@@ -6,7 +6,7 @@ class OrderStatus(Enum):
     PAID = 'paid'
 
 @dataclass
-class Lineitem:
+class LineItem:
     name: str
     price: str
     quantity: int = 1
@@ -18,7 +18,7 @@ class Lineitem:
 
 @dataclass
 class Order:
-    line_items: list[Lineitem] = field(default_factory=list)
+    line_items: list[LineItem] = field(default_factory=list)
     status: OrderStatus = OrderStatus.OPEN
 
     @property
