@@ -1,11 +1,17 @@
 from datetime import datetime
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+API_KEY = os.getenv("API_KEY")
 
 class PaymentProcessor:
     def __init__(self, api_key: str) -> None:
         self.api_key = api_key
 
     def _check_api_key(self) -> bool:
-        return self.api_key == "0super-1secret-2api-3key"
+        return self.api_key == API_KEY
 
     def luhn_checksum(self, card_number: str) -> bool:
         def digits_of(card_nr: str):
