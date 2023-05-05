@@ -8,7 +8,7 @@ API_KEY = os.getenv("API_KEY")
 
 class PaymentProcessor:
     def __init__(self, api_key: str) -> None:
-        self.api_key = api_key
+        self.api_key = API_KEY
 
     def _check_api_key(self) -> bool:
         return self.api_key == API_KEY
