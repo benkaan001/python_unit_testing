@@ -1,213 +1,192 @@
-# **PYTHON UNIT TESTING**
+## Unit Testing For Legacy Code
 
-This is a collection of examples about unit testing in Python. Unit testing is an essetial component of agile development.
+This project involved refactoring legacy code that had no testing. Unit testing was added to the codebase, using `pytest` testing library. The purpose of this project was to demonstrate how unit testing can help write better code.
 
-The motivation behind this repository is to explore key concepts and keep it as a resource for future reference.
+Unit testing can help identify bugs and ensure that changes made to the code do not break existing functionality.
 
+In this project, unit testing also led to the modularization of the code, making it more maintainable.
 
-# Writing Tests with Pytest
+## Testing
 
-The first step is to install Pytest using `pip`:
-
-```
-pip install pytest
-```
-Pytest looks for test functions that start with the prefix `test_`.
-
-# Example class: MyList
-
-Let's begin by defining a custom class called MyList. This class is a basic implementation of a list with some of its `special methods` marked with double underscore - `"dunder"`- overridden.
-
-
-```python
-import pytest
-
-class MyList:
-    def __init__(self, *args):
-        self.data = list(args)
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, index):
-        return self.data[index]
-
-    def __setitem__(self, index, value):
-        self.data[index] = value
-
-    def __delitem__(self, index):
-        del self.data[index]
-
-    def __contains__(self, value):
-        return value in self.data
-
-my_list = MyList(1, 2, 3, 4, 5)
-
-if __name__ == '__main__':
-    pytest.main(['test_dunder.py']) # will run the tests defined in `test_dunder.py` module
+The test coverage report showed that the refactored code has a 97% test coverage. This gives confidence that the code is working as expected.
 
 ```
+===================================================== test session starts =====================================================
 
-The MyList class has six methods implemented:
-
-- `__init__`: initializes the list with any number of values passed as arguments.
-- `__len__`: returns the length of the list.
-- `__getitem__`: returns the value at the given index.
-- `__setitem__`: sets the value at the given index.
-- `__delitem__`: removes the item at the given index.
-- `__contains__`: returns whether a given value is in the list.
-
-The variable `my_list` is an instance of the MyList class.
-
-Here are some tests for the MyList class.
-
-
-```python
-import pytest
-from script import MyList
+---------- coverage: platform darwin, python 3.11.2-final-0 ----------
+Name                          Stmts   Miss  Cover
+-------------------------------------------------
+pay/__init__.py                   0      0   100%
+pay/credit_card.py                6      0   100%
+pay/order.py                     22      0   100%
+pay/payment.py                   23      3    87%
+pay/processor.py                 45      1    98%
+pay/tests/__init__.py             0      0   100%
+pay/tests/test_line_item.py      20      0   100%
+pay/tests/test_order.py          17      0   100%
+pay/tests/test_payment.py        45      3    93%
+pay/tests/test_processor.py      37      0   100%
+-------------------------------------------------
+TOTAL                           215      7    97%
 
 
-def test_constructor():
-    lst = MyList(1, 2, 3)
-    assert len(lst) == 3
-    assert lst[0] == 1
-    assert lst[1] == 2
-    assert lst[2] == 3
-
-def test_len():
-    lst = MyList(1, 2, 3)
-    assert len(lst) == 3
-
-def test_getitem():
-    lst = MyList(1, 2, 3)
-    assert lst[0] == 1
-    assert lst[1] == 2
-    assert lst[2] == 3
-    with pytest.raises(IndexError):
-        item = lst[3]
-
-def test_setitem():
-    lst = MyList(1, 2, 3)
-    lst[1] = 4
-    assert lst[1] == 4
-
-def test_delitem():
-    lst = MyList(1, 2, 3)
-    del lst[1]
-    assert len(lst) == 2
-    assert lst[0] == 1
-    assert lst[1] == 3
-    with pytest.raises(IndexError):
-        item = lst[2]
-
-def test_contains():
-    lst = MyList(1, 2, 3)
-    assert 2 in lst
-    assert 4 not in lst
+===================================================== 20 passed in 0.05s ======================================================
 ```
-# List of Potential Improvements
 
-### 1. Organize the test cases into a class to improve readability and maintainability.
+In order to test ***pay_oder*** functionality, `MonkeyPatch` object from pytest was initially used to ***mock*** the user inputs to run unit tests.
 
-### 2. Using a fixture create a MyList object that can be reused across multiple tests, which in turn will reduce code duplication.
+```py
+def test_pay_order(monkeypatch: MonkeyPatch) -> None:
 
-### 3. Use parametrization to test multiple input/output scenarios for the MyList constructor, rather than repeating the same test code multiple times.
+    # 3. Define a mock version of the charge method to avoid 'charging' the card during testing.
+    def mock_charge(self: PaymentProcessor, card: str, month: int, year: int, amount: int) -> None:
+        pass
 
-### 4. Add custom error messages to provide information about what went wrong if the assertion fails.
+    # Define the inputs to be used by the test.
+    inputs = ["1249190007575069", "12", "2024"]
 
-### 5. Add docstrings to describe what each test case is testing to improving readability.
+    # 1. Mock the input function to simulate user input by returning the next input in the inputs list.
+    monkeypatch.setattr("builtins.input", lambda _: inputs.pop(0))
 
-```python
-import pytest
-from topics.dunder.script import MyList
+    # 2. Mock the check_api_key method to always return True, since we don't want to test it here.
+    monkeypatch.setattr(PaymentProcessor, "_check_api_key", lambda _: True)
+
+    # 4. Mock the charge method of PaymentProcessor to use the mock_charge method defined above.
+    monkeypatch.setattr(PaymentProcessor, "charge", mock_charge)
+
+    # Create an Order object with a single line item.
+    order = Order()
+    order.line_items.append(LineItem(name="Coke", price=300))
+
+    # Call pay_order with the mocked user input and PaymentProcessor charge method.
+    pay_order(order)
+
+    # Check if order status is updated to PAID after payment
+    assert order.status == OrderStatus.PAID
+```
 
 
-class TestMyList:
+Though ***patching*** initially helped test the code, as it became harder to write unit testing code, refactoring became inevitable.
+
+
+## Refactor Changes
+
+
+The refactored version introduced the following changes:
+
+1. ***Use of a protocol:*** Instead of using a concrete class `PaymentProcessor`, the refactored code defines a protocol that abstracts away the implementation details. This makes the code more flexible and easier to test, as it is now possible to use different payment processors that conform to the same interface.
+
+```py
+class PaymentProcessor(Protocol):
+    """A protocol defining the interface for payment processors.
+
+    PaymentProcessor defines the required methods for any payment processor implementation.
+    Any class implementing this protocol must provide the following methods:
+
+    - validate_card(card: CreditCard, month: int, year: int) -> bool
+    - charge(card: CreditCard, amount: int, month: int, year: int) -> bool
     """
-    A test suite for the MyList class.
-    """
-
-    @pytest.fixture
-    def my_list(self):
-        """
-        Fixture that returns an instance of MyList with some initial values.
-        """
-        return MyList(1, 2, 3)
-
-    @pytest.mark.parametrize("input_list, expected_list", [
-        ([1, 2, 3], [1, 2, 3]),
-        ([4, 5, 6], [4, 5, 6]),
-        (["a", "b", "c"], ["a", "b", "c"])
-    ])
-    def test_constructor(self, input_list, expected_list):
-        """
-        Test the constructor of the MyList class with various input values.
-        """
-        my_list = MyList(*input_list)
-        assert len(my_list) == len(expected_list), \
-            f"Expected length of {len(expected_list)}, but got {len(my_list)}"
-        for i in range(len(expected_list)):
-            assert my_list[i] == expected_list[i], \
-                f"Expected {expected_list[i]}, but got {my_list[i]}"
-
-    def test_len(self, my_list):
-        """
-        Test the __len__ method of the MyList class.
-        """
-        assert len(my_list) == 3, f"Expected length of 3, but got {len(my_list)}"
-
-    @pytest.mark.parametrize("index, expected_value", [
-        (0, 1),
-        (1, 2),
-        (2, 3)
-    ])
-    def test_getitem_with_valid_index(self, my_list, index, expected_value):
-        """
-        Test the __getitem__ method of the MyList class with valid indices.
-        """
-        assert my_list[index] == expected_value, \
-            f"Expected {expected_value}, but got {my_list[index]}"
-
-    def test_getitem_with_invalid_index(self, my_list):
-        """
-        Test the __getitem__ method of the MyList class with an invalid index.
-        """
-        with pytest.raises(IndexError, match="list index out of range"):
-            item = my_list[3]
-
-    def test_setitem(self, my_list):
-        """
-        Test the __setitem__ method of the MyList class.
-        """
-        my_list[1] = 4
-        assert my_list[1] == 4, f"Expected 4, but got {my_list[1]}"
-
-    def test_delitem(self, my_list):
-        """
-        Test the __delitem__ method of the MyList class.
-        """
-        del my_list[1]
-        assert len(my_list) == 2, f"Expected length of 2, but got {len(my_list)}"
-        assert my_list[0] == 1, f"Expected 1, but got {my_list[0]}"
-        assert my_list[1] == 3, f"Expected 3, but got {my_list[1]}"
-        with pytest.raises(IndexError, match="list index out of range"):
-            item = my_list[2]
-
-    def test_contains_with_existing_value(self, my_list):
-        """
-        Test the __contains__ method of the MyList class
-        with a value that exists in the list.
-        """
-        assert 2 in my_list, "Expected value not found in list"
-
-    def test_contains_with_non_existing_value(self, my_list):
-        """
-        Test the __contains__ method of the MyList class
-        with a value that does not exist in the list.
-        """
-        assert 4 not in my_list, \
-            f"Expected value 4 to not be in the list, but it was found"
-
+    def validate_card(self, card: CreditCard, month: int, year: int) -> None:
+        """Validates the card with the given expiry date"""
+        pass
+    def charge(self, card: str, amount: float) -> None:
+        """Charges the card with the amount"""
+        pass
 ```
+
+
+
+2. ***Use of `CreditCard` class:*** The refactored code replaces the raw string input for the card details with a `CreditCard` class. This makes it easier to handle and validate card details as a single object.
+
+```py
+@dataclass
+class CreditCard:
+    number: str
+    expiry_month: str
+    expiry_year: str
+```
+
+3. ***Separation of concerns:*** The refactored code separates the payment process into two distinct parts: validating the card and charging the card. This makes it easier to handle and communicate specific errors that may occur during the payment process.
+
+```py
+    def validate_card(self, card: CreditCard, month: int, year: int) -> bool:
+        if not 1 <= month <= 12:
+            raise InvalidMonthError("Invalid expiry month. Month must be in the range of 1 to 12.")
+        expiry_date = datetime(year, month, 1)
+        if expiry_date < datetime.now():
+            raise CardExpiredError("Card is expired.")
+        if not luhn_checksum(card.number):
+            raise ValueError("Invalid Card number")
+        return True
+```
+
+```py
+   def charge(self, card: CreditCard, amount: int) -> None:
+        try:
+            self.validate_card(card, card.expiry_month, card.expiry_year)
+        except CardExpiredError:
+            raise CardExpiredError("Card validation failed: Card is expired.")
+        except ValueError as e:
+            raise ValueError(f"Card validation failed: {e}")
+        if not self._check_api_key():
+            raise ValueError("Invalid API key")
+        print(f"Charging card number {card} for ${amount/100:.2f}")
+```
+Removed the ***luhn_checksum()*** call from the `validate_card()` method, as it is now called outside the class. Moved the `luhn_checksum()` function outside the `PaymentProcessor` class, making it a separate function that can be accessed from anywhere in the module.
+
+```py
+def luhn_checksum(card_number: str) -> bool:
+        def digits_of(card_nr: str):
+            return [int(d) for d in card_nr]
+
+        digits = digits_of(card_number)
+        odd_digits = digits[-1::-2]
+        even_digits = digits[-2::-2]
+        checksum =0
+        checksum += sum(odd_digits)
+        for digit in even_digits:
+            checksum += sum(digits_of(str(digit * 2)))
+        return checksum % 10 == 0
+```
+
+
+4. ***Better error handling:*** The refactored code improves on the error handling by using specific exceptions (`CardExpiredError` and `InvalidMonthError`) instead of the general `ValueError` used in the original code. This makes it easier to handle specific errors and provide better feedback to the user.
+
+```py
+class CardExpiredError(Exception):
+    pass
+
+class InvalidMonthError(Exception):
+    pass
+
+def pay_order(order: Order, card: CreditCard, processor: PaymentProcessor) -> None:
+    amount = order.total
+    if amount == 0:
+        raise ValueError("Cannot pay an order with total 0.")
+
+    try:
+        processor.validate_card(card, card.expiry_month, card.expiry_year)
+        processor.charge(card, amount)
+    except CardExpiredError:
+        print("Card is expired. Please use a different card.")
+    except InvalidMonthError:
+        print("Invalid expiry month. Please enter a valid month between 1 and 12.")
+    except ValueError as e:
+        print(f"Payment failed: {e}")
+    else:
+        order.pay()
+        print(f"Order paid in full: ${order.total/100:.2f}")
+```
+
+### ***Error Handling***
+
+1. Created custom exception classes to handle specific errors that may occur in the payment process, such as ***CardExpiredError*** and ***InvalidMonthError***. This allows us to raise more informative errors that can be caught and handled appropriately.
+
+2. Modified the ***pay_order*** function to catch these custom exceptions and print user-friendly error messages instead of raising generic ***ValueError*** exceptions.
+
+3. Added input validation to the ***CreditCard*** class to ensure that the card number, expiry month, and expiry year are valid before attempting to use them in the payment process.
+
+Overall, the changes made the code more modular and easier to maintain, by separating the functions that can be used elsewhere in the module, and defining custom exception classes to handle specific exceptions during card validation.
+
 
 
