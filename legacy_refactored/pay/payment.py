@@ -15,6 +15,10 @@ class PaymentProcessor(Protocol):
     - validate_card(card: CreditCard, month: int, year: int) -> bool
     - charge(card: CreditCard, amount: int, month: int, year: int) -> bool
     """
+    def validate_card(self, card: CreditCard, month: int, year: int) -> None:
+        """Validates the card with the given expiry date"""
+        pass
+
     def charge(self, card: str, amount: float) -> None:
         """Charges the card with the amount"""
         pass
